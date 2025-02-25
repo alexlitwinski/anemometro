@@ -1,5 +1,5 @@
-// anemometro-card-v3.js
-// Versão 3.0.0 - Animação fluida e visual aprimorado
+// anemometro-card-v4.js
+// Versão 4.0.0 - Ajuste de escala, sensibilidade e correção do pedestal
 class AnemometroCard extends HTMLElement {
   // Definir propriedades estáticas para o card
   static get properties() {
@@ -15,7 +15,7 @@ class AnemometroCard extends HTMLElement {
     this.rotationSpeed = 0;
     this.firstRender = true;
     this._updateRotationSpeed = this._updateRotationSpeed.bind(this);
-    console.log("Anemômetro Card v3.0.0 carregado");
+    console.log("Anemômetro Card v4.0.0 carregado");
   }
 
   setConfig(config) {
@@ -53,26 +53,31 @@ class AnemometroCard extends HTMLElement {
   }
   
   _calculateRotationSpeed(velocidadeVento) {
-    // Escala de 0-10 km/h
-    const minVelocidade = 0;
-    const maxVelocidade = 10; 
-    const maxDuracao = 30; // segundos
-    const minDuracao = 0.5; // segundos
+    // AJUSTE: Velocidade mínima é 0.1, máxima é 5 km/h
+    const minVelocidade = 0.1; // Começa a girar em 0.1 km/h
+    const maxVelocidade = 5.0; // Velocidade máxima em 5 km/h
     
-    // Limitar e verificar velocidade mínima
-    const velocidadeLimitada = Math.max(velocidadeVento, minVelocidade);
+    // Valores de duração de animação (em segundos)
+    const maxDuracao = 60; // Muito lento (0.1 km/h)
+    const minDuracao = 1.0; // Muito rápido (5 km/h ou mais)
     
-    if (velocidadeLimitada <= 0.1) {
-      return 0; // Parado
+    // IMPORTANTE: Se a velocidade for menor que o mínimo, retorna uma duração muito longa
+    // Isso faz com que o anemômetro gire extremamente devagar, mas não pare completamente
+    if (velocidadeVento < minVelocidade) {
+      return 120; // Giro muito lento, quase imperceptível, mas existe
     }
     
-    // Calcular duração (tempo inverso à velocidade)
+    // Limitar a velocidade do vento ao intervalo definido
+    const velocidadeLimitada = Math.min(Math.max(velocidadeVento, minVelocidade), maxVelocidade);
+    
+    // Calcular a duração da animação inversamente proporcional à velocidade
+    // Quanto maior a velocidade, menor a duração (mais rápido gira)
     const duracao = Math.max(
       minDuracao,
-      maxDuracao - ((velocidadeLimitada / maxVelocidade) * (maxDuracao - minDuracao))
+      maxDuracao - ((velocidadeLimitada - minVelocidade) / (maxVelocidade - minVelocidade)) * (maxDuracao - minDuracao)
     );
     
-    console.log(`Velocidade: ${velocidadeLimitada.toFixed(1)} km/h, Duração: ${duracao.toFixed(1)}s`);
+    console.log(`Velocidade: ${velocidadeVento.toFixed(1)} km/h, Duração: ${duracao.toFixed(1)}s`);
     return duracao;
   }
   
@@ -80,12 +85,9 @@ class AnemometroCard extends HTMLElement {
     const rotor = this.shadowRoot.querySelector('.anemometro-rotor');
     if (!rotor) return;
     
-    if (this.rotationSpeed <= 0) {
-      rotor.style.animationPlayState = 'paused';
-    } else {
-      rotor.style.animationDuration = `${this.rotationSpeed}s`;
-      rotor.style.animationPlayState = 'running';
-    }
+    // Nunca pausa completamente a animação, apenas ajusta a velocidade
+    rotor.style.animationDuration = `${this.rotationSpeed}s`;
+    rotor.style.animationPlayState = 'running';
   }
   
   _updateValorDisplay(state) {
@@ -112,7 +114,7 @@ class AnemometroCard extends HTMLElement {
                    'km/h';
     const nome = this.config.name || state.attributes.friendly_name || entityId;
     
-    // Estrutura do card com estilos aprimorados
+    // Estrutura do card com estilos aprimorados e correção do pedestal
     this.shadowRoot.innerHTML = `
       <ha-card>
         <style>
@@ -140,11 +142,11 @@ class AnemometroCard extends HTMLElement {
             position: relative;
           }
           
-          /* Base e pedestal */
+          /* Pedestal corrigido - agora vai até o centro */
           .anemometro-pedestal {
             position: absolute;
             width: 8px;
-            height: 40px;
+            height: 80px; /* Altura aumentada */
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
@@ -174,8 +176,8 @@ class AnemometroCard extends HTMLElement {
             top: 0;
             left: 0;
             animation: rotate linear infinite;
-            animation-duration: ${this.rotationSpeed <= 0 ? '0s' : this.rotationSpeed + 's'};
-            animation-play-state: ${this.rotationSpeed <= 0 ? 'paused' : 'running'};
+            animation-duration: ${this.rotationSpeed}s;
+            animation-play-state: running;
             transform-origin: center;
             z-index: 3;
           }
@@ -274,7 +276,7 @@ class AnemometroCard extends HTMLElement {
           <div class="valor-container">
             <div class="valor">${parseFloat(state.state).toFixed(1)} ${unidade}</div>
           </div>
-          <div class="version">v3.0.0</div>
+          <div class="version">v4.0.0</div>
         </div>
       </ha-card>
     `;
