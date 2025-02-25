@@ -12,9 +12,7 @@ class AnemometroCard extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.rotationSpeed = 0;
-    this.animationFrame = null;
-    this.currentRotation = 0;
-    this.lastTimestamp = 0;
+    this._updateHass = this._updateHass.bind(this);
   }
 
   setConfig(config) {
@@ -22,13 +20,22 @@ class AnemometroCard extends HTMLElement {
       throw new Error('Você precisa definir uma entidade');
     }
     this.config = config;
+    this.render();
   }
 
   set hass(hass) {
-    this._hass = hass;
-    
+    if (!this._hass) {
+      this._hass = hass;
+      this.render();
+    } else {
+      this._hass = hass;
+      this._updateHass();
+    }
+  }
+  
+  _updateHass() {
     const entityId = this.config.entity;
-    const state = hass.states[entityId];
+    const state = this._hass.states[entityId];
     
     if (state) {
       // Obter a velocidade do vento da entidade
@@ -37,28 +44,62 @@ class AnemometroCard extends HTMLElement {
       // Definir a velocidade de rotação baseada na velocidade do vento
       this.rotationSpeed = this._calculateRotationSpeed(velocidadeVento);
       
-      // Renderizar o card
-      this.updateCard();
+      // Atualizar somente os elementos que precisam ser atualizados
+      this._updateRotationSpeed();
+      this._updateValorDisplay(state);
     }
   }
   
   _calculateRotationSpeed(velocidadeVento) {
-    // Função que converte a velocidade do vento em velocidade de rotação
-    // Ajuste estes valores conforme necessário
+    // Função que converte a velocidade do vento em velocidade de rotação (em segundos)
     const minVelocidade = 0;
     const maxVelocidade = 120; // km/h
-    const minRotacao = 0;
-    const maxRotacao = 30; // rotações por segundo
+    const maxDuracao = 60; // duração máxima em segundos (praticamente parado)
+    const minDuracao = 0.2; // duração mínima em segundos (muito rápido)
     
     // Limitar a velocidade do vento ao intervalo definido
-    const velocidadeLimitada = Math.min(Math.max(velocidadeVento, minVelocidade), maxVelocidade);
+    const velocidadeLimitada = Math.max(velocidadeVento, minVelocidade);
     
-    // Calcular a velocidade de rotação proporcional
-    return minRotacao + (velocidadeLimitada - minVelocidade) * 
-           (maxRotacao - minRotacao) / (maxVelocidade - minVelocidade);
+    if (velocidadeLimitada <= 0.1) {
+      return 0; // Parado
+    }
+    
+    // Calcular a duração da animação inversamente proporcional à velocidade
+    // Quanto maior a velocidade, menor a duração (mais rápido gira)
+    const duracao = Math.max(
+      minDuracao,
+      maxDuracao - ((velocidadeLimitada / maxVelocidade) * (maxDuracao - minDuracao))
+    );
+    
+    return duracao;
   }
   
-  updateCard() {
+  _updateRotationSpeed() {
+    const animateElement = this.shadowRoot.querySelector('animateTransform');
+    if (animateElement) {
+      if (this.rotationSpeed <= 0) {
+        // Parar a animação
+        animateElement.setAttribute('dur', '0s');
+        animateElement.setAttribute('repeatCount', '0');
+      } else {
+        // Atualizar a velocidade
+        animateElement.setAttribute('dur', `${this.rotationSpeed}s`);
+        animateElement.setAttribute('repeatCount', 'indefinite');
+      }
+    }
+  }
+  
+  _updateValorDisplay(state) {
+    const valorElement = this.shadowRoot.querySelector('.valor');
+    if (valorElement && state) {
+      const unidade = this.config.unit_of_measurement || 
+                     state.attributes.unit_of_measurement || 
+                     'km/h';
+      valorElement.textContent = `${parseFloat(state.state).toFixed(1)} ${unidade}`;
+    }
+  }
+  
+  render() {
     if (!this._hass || !this.config) {
       return;
     }
@@ -77,6 +118,10 @@ class AnemometroCard extends HTMLElement {
     
     // Obter rótulo personalizado ou usar o nome amigável da entidade
     const nome = this.config.name || state.attributes.friendly_name || entityId;
+    
+    // Velocidade do vento e duração da animação
+    const velocidadeVento = parseFloat(state.state);
+    this.rotationSpeed = this._calculateRotationSpeed(velocidadeVento);
     
     // Criar o conteúdo do card
     this.shadowRoot.innerHTML = `
@@ -99,56 +144,10 @@ class AnemometroCard extends HTMLElement {
             text-align: center;
           }
           .anemometro-container {
-            position: relative;
             width: 200px;
             height: 200px;
             margin: 10px 0;
           }
-          .anemometro-base {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: #888;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 3;
-          }
-          .anemometro-rotor {
-            position: absolute;
-            width: 200px;
-            height: 200px;
-            top: 0;
-            left: 0;
-          }
-          .braco {
-            position: absolute;
-            width: 80px;
-            height: 3px;
-            background-color: #666;
-            top: 50%;
-            left: 50%;
-            transform-origin: left center;
-            z-index: 1;
-          }
-          .braco-1 { transform: translate(0, -50%) rotate(0deg); }
-          .braco-2 { transform: translate(0, -50%) rotate(90deg); }
-          .braco-3 { transform: translate(0, -50%) rotate(180deg); }
-          .braco-4 { transform: translate(0, -50%) rotate(270deg); }
-          .copo {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            background-color: #444;
-            border-radius: 50% 50% 0 50%;
-            transform-origin: center;
-            z-index: 2;
-          }
-          .copo-1 { top: 50%; right: 10px; transform: translate(0, -50%) rotate(45deg); }
-          .copo-2 { top: 10px; left: 50%; transform: translate(-50%, 0) rotate(135deg); }
-          .copo-3 { top: 50%; left: 10px; transform: translate(0, -50%) rotate(225deg); }
-          .copo-4 { bottom: 10px; left: 50%; transform: translate(-50%, 0) rotate(315deg); }
           .valor {
             font-size: 1.5em;
             font-weight: bold;
@@ -158,74 +157,40 @@ class AnemometroCard extends HTMLElement {
         <div class="card-content">
           <div class="title">${nome}</div>
           <div class="anemometro-container">
-            <div class="anemometro-rotor" id="rotor">
-              <div class="braco braco-1"></div>
-              <div class="braco braco-2"></div>
-              <div class="braco braco-3"></div>
-              <div class="braco braco-4"></div>
-              <div class="copo copo-1"></div>
-              <div class="copo copo-2"></div>
-              <div class="copo copo-3"></div>
-              <div class="copo copo-4"></div>
-            </div>
-            <div class="anemometro-base"></div>
+            <svg viewBox="0 0 200 200" width="200" height="200">
+              <!-- Base/Centro do anemômetro -->
+              <circle cx="100" cy="100" r="10" fill="#888" />
+              
+              <!-- Grupo rotativo com braços e copos -->
+              <g id="rotor">
+                <!-- Braços -->
+                <line x1="100" y1="100" x2="180" y2="100" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="100" y2="180" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="20" y2="100" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="100" y2="20" stroke="#666" stroke-width="3" />
+                
+                <!-- Copos -->
+                <path d="M180,100 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(45,180,100)" />
+                <path d="M100,180 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(135,100,180)" />
+                <path d="M20,100 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(225,20,100)" />
+                <path d="M100,20 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(315,100,20)" />
+                
+                <!-- Animação -->
+                <animateTransform
+                  attributeName="transform"
+                  attributeType="XML"
+                  type="rotate"
+                  from="0 100 100"
+                  to="360 100 100"
+                  dur="${this.rotationSpeed <= 0 ? '0s' : this.rotationSpeed + 's'}"
+                  repeatCount="${this.rotationSpeed <= 0 ? '0' : 'indefinite'}" />
+              </g>
+            </svg>
           </div>
           <div class="valor">${parseFloat(state.state).toFixed(1)} ${unidade}</div>
         </div>
       </ha-card>
     `;
-    
-    // Iniciar a animação
-    this.startAnimation();
-  }
-  
-  startAnimation() {
-    // Parar qualquer animação anterior
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
-    
-    const rotor = this.shadowRoot.getElementById('rotor');
-    if (!rotor) return;
-    
-    // Se a velocidade for zero, parar a animação
-    if (this.rotationSpeed <= 0) {
-      return;
-    }
-    
-    // Usando requestAnimationFrame para animação suave
-    const animate = (timestamp) => {
-      if (!this.lastTimestamp) {
-        this.lastTimestamp = timestamp;
-      }
-      
-      // Calcular o delta de tempo em segundos
-      const deltaTime = (timestamp - this.lastTimestamp) / 1000;
-      this.lastTimestamp = timestamp;
-      
-      // Atualizar o ângulo de rotação
-      this.currentRotation += this.rotationSpeed * 360 * deltaTime;
-      
-      // Manter o valor do ângulo gerenciável
-      if (this.currentRotation >= 360) {
-        this.currentRotation = this.currentRotation % 360;
-      }
-      
-      // Aplicar a rotação
-      rotor.style.transform = `rotate(${this.currentRotation}deg)`;
-      
-      // Continuar a animação
-      this.animationFrame = requestAnimationFrame(animate);
-    };
-    
-    this.animationFrame = requestAnimationFrame(animate);
-  }
-  
-  // Limpar a animação quando o elemento é removido
-  disconnectedCallback() {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
   }
   
   // Define o tamanho do card para o Lovelace
