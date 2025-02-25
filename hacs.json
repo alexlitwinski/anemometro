@@ -1,0 +1,7 @@
+{
+  "name": "Anemômetro Card",
+  "content_in_root": false,
+  "filename": "anemometro-card.js",
+  "render_readme": true,
+  "country": ["BR"]
+}
