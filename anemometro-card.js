@@ -13,6 +13,8 @@ class AnemometroCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.rotationSpeed = 0;
     this.animationFrame = null;
+    this.currentRotation = 0;
+    this.lastTimestamp = 0;
   }
 
   setConfig(config) {
@@ -33,7 +35,6 @@ class AnemometroCard extends HTMLElement {
       const velocidadeVento = parseFloat(state.state);
       
       // Definir a velocidade de rotação baseada na velocidade do vento
-      // Ajuste o fator de multiplicação para controlar a velocidade de rotação
       this.rotationSpeed = this._calculateRotationSpeed(velocidadeVento);
       
       // Renderizar o card
@@ -105,14 +106,14 @@ class AnemometroCard extends HTMLElement {
           }
           .anemometro-base {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 20px;
+            height: 20px;
             background-color: #888;
             border-radius: 50%;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 2;
+            z-index: 3;
           }
           .anemometro-rotor {
             position: absolute;
@@ -120,35 +121,48 @@ class AnemometroCard extends HTMLElement {
             height: 200px;
             top: 0;
             left: 0;
-            animation: rotate linear infinite;
-            animation-play-state: paused;
           }
+          .braco {
+            position: absolute;
+            width: 80px;
+            height: 3px;
+            background-color: #666;
+            top: 50%;
+            left: 50%;
+            transform-origin: left center;
+            z-index: 1;
+          }
+          .braco-1 { transform: translate(0, -50%) rotate(0deg); }
+          .braco-2 { transform: translate(0, -50%) rotate(90deg); }
+          .braco-3 { transform: translate(0, -50%) rotate(180deg); }
+          .braco-4 { transform: translate(0, -50%) rotate(270deg); }
           .copo {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
             background-color: #444;
             border-radius: 50% 50% 0 50%;
             transform-origin: center;
+            z-index: 2;
           }
-          .copo-1 { top: 0; left: 50%; transform: translate(-50%, 0) rotate(0deg); }
-          .copo-2 { top: 50%; right: 0; transform: translate(0, -50%) rotate(90deg); }
-          .copo-3 { bottom: 0; left: 50%; transform: translate(-50%, 0) rotate(180deg); }
-          .copo-4 { top: 50%; left: 0; transform: translate(0, -50%) rotate(270deg); }
+          .copo-1 { top: 50%; right: 10px; transform: translate(0, -50%) rotate(45deg); }
+          .copo-2 { top: 10px; left: 50%; transform: translate(-50%, 0) rotate(135deg); }
+          .copo-3 { top: 50%; left: 10px; transform: translate(0, -50%) rotate(225deg); }
+          .copo-4 { bottom: 10px; left: 50%; transform: translate(-50%, 0) rotate(315deg); }
           .valor {
             font-size: 1.5em;
             font-weight: bold;
             margin-top: 10px;
-          }
-          @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
           }
         </style>
         <div class="card-content">
           <div class="title">${nome}</div>
           <div class="anemometro-container">
             <div class="anemometro-rotor" id="rotor">
+              <div class="braco braco-1"></div>
+              <div class="braco braco-2"></div>
+              <div class="braco braco-3"></div>
+              <div class="braco braco-4"></div>
               <div class="copo copo-1"></div>
               <div class="copo copo-2"></div>
               <div class="copo copo-3"></div>
@@ -176,15 +190,42 @@ class AnemometroCard extends HTMLElement {
     
     // Se a velocidade for zero, parar a animação
     if (this.rotationSpeed <= 0) {
-      rotor.style.animationPlayState = 'paused';
       return;
     }
     
-    // Definir a duração da animação com base na velocidade
-    // Quanto maior a velocidade, menor a duração (mais rápido gira)
-    const duracao = 1 / this.rotationSpeed;
-    rotor.style.animationDuration = `${duracao}s`;
-    rotor.style.animationPlayState = 'running';
+    // Usando requestAnimationFrame para animação suave
+    const animate = (timestamp) => {
+      if (!this.lastTimestamp) {
+        this.lastTimestamp = timestamp;
+      }
+      
+      // Calcular o delta de tempo em segundos
+      const deltaTime = (timestamp - this.lastTimestamp) / 1000;
+      this.lastTimestamp = timestamp;
+      
+      // Atualizar o ângulo de rotação
+      this.currentRotation += this.rotationSpeed * 360 * deltaTime;
+      
+      // Manter o valor do ângulo gerenciável
+      if (this.currentRotation >= 360) {
+        this.currentRotation = this.currentRotation % 360;
+      }
+      
+      // Aplicar a rotação
+      rotor.style.transform = `rotate(${this.currentRotation}deg)`;
+      
+      // Continuar a animação
+      this.animationFrame = requestAnimationFrame(animate);
+    };
+    
+    this.animationFrame = requestAnimationFrame(animate);
+  }
+  
+  // Limpar a animação quando o elemento é removido
+  disconnectedCallback() {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
   }
   
   // Define o tamanho do card para o Lovelace
