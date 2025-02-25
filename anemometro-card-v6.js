@@ -67,7 +67,7 @@ class AnemometroCard extends HTMLElement {
     
     // IMPORTANTE: Se a velocidade for menor que o mínimo, usa o RPM mínimo
     if (velocidadeVento < minVelocidade) {
-      return this._rpmToSpeed(minRPM / 2); // Metade do RPM mínimo para velocidades abaixo do limiar
+      return this._rpmToSpeed(minRPM / 6); // Metade do RPM mínimo para velocidades abaixo do limiar
     }
     
     // Limitar a velocidade do vento ao intervalo definido
