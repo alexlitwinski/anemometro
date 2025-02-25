@@ -1,5 +1,5 @@
-// anemometro-card-v4.js
-// Versão 4.0.0 - Ajuste de escala, sensibilidade e correção do pedestal
+// anemometro-card-v7.js
+// Versão 7.0.0 - Abordagem completamente nova para os braços e copos
 class AnemometroCard extends HTMLElement {
   // Definir propriedades estáticas para o card
   static get properties() {
@@ -15,7 +15,7 @@ class AnemometroCard extends HTMLElement {
     this.rotationSpeed = 0;
     this.firstRender = true;
     this._updateRotationSpeed = this._updateRotationSpeed.bind(this);
-    console.log("Anemômetro Card v4.0.0 carregado");
+    console.log("Anemômetro Card v7.0.0 carregado");
   }
 
   setConfig(config) {
@@ -82,7 +82,7 @@ class AnemometroCard extends HTMLElement {
   }
   
   _updateRotationSpeed() {
-    const rotor = this.shadowRoot.querySelector('.anemometro-rotor');
+    const rotor = this.shadowRoot.querySelector('#rotor');
     if (!rotor) return;
     
     // Nunca pausa completamente a animação, apenas ajusta a velocidade
@@ -114,7 +114,7 @@ class AnemometroCard extends HTMLElement {
                    'km/h';
     const nome = this.config.name || state.attributes.friendly_name || entityId;
     
-    // Estrutura do card com estilos aprimorados e correção do pedestal
+    // Estrutura do card com abordagem SVG para garantir simetria
     this.shadowRoot.innerHTML = `
       <ha-card>
         <style>
@@ -142,95 +142,19 @@ class AnemometroCard extends HTMLElement {
             position: relative;
           }
           
-          /* Pedestal corrigido - agora vai até o centro */
-          .anemometro-pedestal {
-            position: absolute;
-            width: 8px;
-            height: 80px; /* Altura aumentada */
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(to right, #555, #888, #555);
-            border-radius: 2px;
-            z-index: 1;
-          }
-          
-          .anemometro-base {
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: radial-gradient(circle at 35% 35%, #999, #666);
-            border-radius: 50%;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            z-index: 4;
-          }
-          
-          /* Rotor com braços e copos */
-          .anemometro-rotor {
+          #rotor {
             position: absolute;
             width: 100%;
             height: 100%;
-            top: 0;
-            left: 0;
             animation: rotate linear infinite;
             animation-duration: ${this.rotationSpeed}s;
             animation-play-state: running;
             transform-origin: center;
-            z-index: 3;
           }
           
           @keyframes rotate {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
-          }
-          
-          /* Braços estilizados */
-          .braco {
-            position: absolute;
-            width: 75px;
-            height: 3px;
-            top: 50%;
-            left: 50%;
-            transform-origin: left center;
-            background: linear-gradient(to right, #777, #555);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            z-index: 2;
-          }
-          
-          .braco-1 { transform: translate(0, -50%) rotate(0deg); }
-          .braco-2 { transform: translate(0, -50%) rotate(120deg); }
-          .braco-3 { transform: translate(0, -50%) rotate(240deg); }
-          
-          /* Copos do anemômetro estilizados */
-          .copo {
-            position: absolute;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #555, #333);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            z-index: 2;
-          }
-          
-          .copo-1 {
-            top: 50%;
-            right: 10px;
-            transform: translateY(-50%);
-          }
-          
-          .copo-2 {
-            top: 15%;
-            left: 30%;
-            transform: translate(-50%, -50%);
-          }
-          
-          .copo-3 {
-            bottom: 15%;
-            left: 30%;
-            transform: translate(-50%, 50%);
           }
           
           /* Display de valor */
@@ -262,24 +186,37 @@ class AnemometroCard extends HTMLElement {
         <div class="card-content">
           <div class="title">${nome}</div>
           <div class="anemometro-container">
-            <div class="anemometro-pedestal"></div>
-            <div class="anemometro-rotor">
-              <div class="braco braco-1"></div>
-              <div class="braco braco-2"></div>
-              <div class="braco braco-3"></div>
-              <div class="copo copo-1"></div>
-              <div class="copo copo-2"></div>
-              <div class="copo copo-3"></div>
-            </div>
-            <div class="anemometro-base"></div>
+            <svg viewBox="0 0 200 200" width="200" height="200">
+              <!-- Pedestal -->
+              <rect x="96" y="100" width="8" height="90" rx="2" ry="2" fill="#777" />
+              
+              <!-- Grupo rotativo -->
+              <g id="rotor">
+                <!-- 3 Braços perfeitamente simétricos -->
+                <line x1="100" y1="100" x2="170" y2="100" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="65" y2="160.62" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="65" y2="39.38" stroke="#666" stroke-width="3" />
+                
+                <!-- 3 Copos -->
+                <circle cx="170" cy="100" r="15" fill="#444" />
+                <circle cx="65" cy="160.62" r="15" fill="#444" />
+                <circle cx="65" cy="39.38" r="15" fill="#444" />
+              </g>
+              
+              <!-- Centro/Base (por cima dos braços) -->
+              <circle cx="100" cy="100" r="10" fill="#888" />
+            </svg>
           </div>
           <div class="valor-container">
             <div class="valor">${parseFloat(state.state).toFixed(1)} ${unidade}</div>
           </div>
-          <div class="version">v4.0.0</div>
+          <div class="version">v7.0</div>
         </div>
       </ha-card>
     `;
+    
+    // Atualizar a velocidade de rotação após criar o card
+    this._updateRotationSpeed();
   }
   
   disconnectedCallback() {
