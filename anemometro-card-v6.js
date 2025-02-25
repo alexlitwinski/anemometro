@@ -1,5 +1,5 @@
-// anemometro-card-v7.js
-// Versão 7.0.0 - Abordagem completamente nova para os braços e copos
+// anemometro-card-v8.js
+// Versão 8.0.0 - Rotação contínua e escala de velocidade ajustada
 class AnemometroCard extends HTMLElement {
   // Definir propriedades estáticas para o card
   static get properties() {
@@ -14,8 +14,10 @@ class AnemometroCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.rotationSpeed = 0;
     this.firstRender = true;
-    this._updateRotationSpeed = this._updateRotationSpeed.bind(this);
-    console.log("Anemômetro Card v7.0.0 carregado");
+    this.currentRotation = 0;
+    this.lastTime = Date.now();
+    this.rafId = null;
+    console.log("Anemômetro Card v8.0.0 carregado");
   }
 
   setConfig(config) {
@@ -41,8 +43,10 @@ class AnemometroCard extends HTMLElement {
       if (this.firstRender) {
         this._createCard();
         this.firstRender = false;
+        this._startAnimation();
       } else if (oldRotationSpeed !== this.rotationSpeed) {
-        this._updateRotationSpeed();
+        // A velocidade mudou, mas continuamos a animação sem reiniciar
+        console.log(`Velocidade alterada: ${velocidadeVento.toFixed(1)} km/h, RPM: ${this._calculateRPM(this.rotationSpeed)}`);
       }
       
       // Atualizar apenas o valor exibido
@@ -57,37 +61,34 @@ class AnemometroCard extends HTMLElement {
     const minVelocidade = 0.1; // Começa a girar em 0.1 km/h
     const maxVelocidade = 5.0; // Velocidade máxima em 5 km/h
     
-    // Valores de duração de animação (em segundos)
-    const maxDuracao = 60; // Muito lento (0.1 km/h)
-    const minDuracao = 1.0; // Muito rápido (5 km/h ou mais)
+    // AJUSTE: Valores de RPM (rotações por minuto) em vez de duração
+    const minRPM = 1; // 1 rotação por minuto em 0.1 km/h (muito lento)
+    const maxRPM = 120; // 120 rotações por minuto em 5 km/h (2 por segundo - rápido)
     
-    // IMPORTANTE: Se a velocidade for menor que o mínimo, retorna uma duração muito longa
-    // Isso faz com que o anemômetro gire extremamente devagar, mas não pare completamente
+    // IMPORTANTE: Se a velocidade for menor que o mínimo, usa o RPM mínimo
     if (velocidadeVento < minVelocidade) {
-      return 120; // Giro muito lento, quase imperceptível, mas existe
+      return this._rpmToSpeed(minRPM / 2); // Metade do RPM mínimo para velocidades abaixo do limiar
     }
     
     // Limitar a velocidade do vento ao intervalo definido
     const velocidadeLimitada = Math.min(Math.max(velocidadeVento, minVelocidade), maxVelocidade);
     
-    // Calcular a duração da animação inversamente proporcional à velocidade
-    // Quanto maior a velocidade, menor a duração (mais rápido gira)
-    const duracao = Math.max(
-      minDuracao,
-      maxDuracao - ((velocidadeLimitada - minVelocidade) / (maxVelocidade - minVelocidade)) * (maxDuracao - minDuracao)
-    );
+    // Calcular o RPM proporcional à velocidade
+    const rpm = minRPM + ((velocidadeLimitada - minVelocidade) / (maxVelocidade - minVelocidade)) * (maxRPM - minRPM);
     
-    console.log(`Velocidade: ${velocidadeVento.toFixed(1)} km/h, Duração: ${duracao.toFixed(1)}s`);
-    return duracao;
+    // Converter RPM para a velocidade angular usada na animação
+    return this._rpmToSpeed(rpm);
   }
   
-  _updateRotationSpeed() {
-    const rotor = this.shadowRoot.querySelector('#rotor');
-    if (!rotor) return;
-    
-    // Nunca pausa completamente a animação, apenas ajusta a velocidade
-    rotor.style.animationDuration = `${this.rotationSpeed}s`;
-    rotor.style.animationPlayState = 'running';
+  // Converte RPM para velocidade angular em radianos por milissegundo
+  _rpmToSpeed(rpm) {
+    // rpm * 2π / 60000 = radianos por milissegundo
+    return (rpm * 2 * Math.PI) / 60000;
+  }
+  
+  // Calcula o RPM a partir da velocidade angular
+  _calculateRPM(speed) {
+    return (speed * 60000) / (2 * Math.PI);
   }
   
   _updateValorDisplay(state) {
@@ -98,6 +99,39 @@ class AnemometroCard extends HTMLElement {
                      'km/h';
       valorElement.textContent = `${parseFloat(state.state).toFixed(1)} ${unidade}`;
     }
+  }
+  
+  _startAnimation() {
+    // Inicializa o tempo e o ângulo
+    this.lastTime = Date.now();
+    this.currentRotation = 0;
+    
+    // Função de animação
+    const animate = () => {
+      const now = Date.now();
+      const deltaTime = now - this.lastTime;
+      this.lastTime = now;
+      
+      // Atualiza o ângulo de rotação com base na velocidade atual
+      this.currentRotation += this.rotationSpeed * deltaTime;
+      
+      // Normaliza para 0-2π para evitar números muito grandes
+      this.currentRotation %= (2 * Math.PI);
+      
+      // Aplica a rotação ao elemento SVG
+      const rotor = this.shadowRoot.querySelector('#rotor');
+      if (rotor) {
+        // Converte radianos para graus
+        const degrees = (this.currentRotation * 180 / Math.PI);
+        rotor.setAttribute('transform', `rotate(${degrees} 100 100)`);
+      }
+      
+      // Continua a animação
+      this.rafId = requestAnimationFrame(animate);
+    };
+    
+    // Inicia o loop de animação
+    this.rafId = requestAnimationFrame(animate);
   }
   
   _createCard() {
@@ -114,7 +148,7 @@ class AnemometroCard extends HTMLElement {
                    'km/h';
     const nome = this.config.name || state.attributes.friendly_name || entityId;
     
-    // Estrutura do card com abordagem SVG para garantir simetria
+    // Estrutura do card com SVG para garantir simetria
     this.shadowRoot.innerHTML = `
       <ha-card>
         <style>
@@ -140,21 +174,6 @@ class AnemometroCard extends HTMLElement {
             height: 200px;
             margin: 10px 0;
             position: relative;
-          }
-          
-          #rotor {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            animation: rotate linear infinite;
-            animation-duration: ${this.rotationSpeed}s;
-            animation-play-state: running;
-            transform-origin: center;
-          }
-          
-          @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
           }
           
           /* Display de valor */
@@ -190,7 +209,7 @@ class AnemometroCard extends HTMLElement {
               <!-- Pedestal -->
               <rect x="96" y="100" width="8" height="90" rx="2" ry="2" fill="#777" />
               
-              <!-- Grupo rotativo -->
+              <!-- Grupo rotativo - transformação aplicada via JavaScript para animação contínua -->
               <g id="rotor">
                 <!-- 3 Braços perfeitamente simétricos -->
                 <line x1="100" y1="100" x2="170" y2="100" stroke="#666" stroke-width="3" />
@@ -210,17 +229,18 @@ class AnemometroCard extends HTMLElement {
           <div class="valor-container">
             <div class="valor">${parseFloat(state.state).toFixed(1)} ${unidade}</div>
           </div>
-          <div class="version">v7.0</div>
+          <div class="version">v8.0</div>
         </div>
       </ha-card>
     `;
-    
-    // Atualizar a velocidade de rotação após criar o card
-    this._updateRotationSpeed();
   }
   
   disconnectedCallback() {
-    // Limpar qualquer recurso quando o elemento for removido
+    // Limpar o loop de animação quando o elemento for removido
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
     console.log("Anemômetro card removido");
   }
   
