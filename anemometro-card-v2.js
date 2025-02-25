@@ -1,5 +1,5 @@
 // anemometro-card-v2.js
-// Versão 2.0.0 - Implementação com 3 braços e SVG animado
+// Versão 2.0.1 - Correção de posicionamento e velocidade
 class AnemometroCard extends HTMLElement {
   // Definir propriedades estáticas para o card
   static get properties() {
@@ -15,7 +15,7 @@ class AnemometroCard extends HTMLElement {
     this.rotationSpeed = 0;
     this._updateHass = this._updateHass.bind(this);
     // Versão para debug de cache
-    console.log("Anemômetro Card v2.0.0 carregado");
+    console.log("Anemômetro Card v2.0.1 carregado");
   }
 
   setConfig(config) {
@@ -58,7 +58,7 @@ class AnemometroCard extends HTMLElement {
     // Ajustado para escala de 0-10 km/h
     const minVelocidade = 0;
     const maxVelocidade = 10; // km/h - valor máximo ajustado
-    const maxDuracao = 60; // duração máxima em segundos (praticamente parado)
+    const maxDuracao = 30; // duração máxima em segundos (mais lento)
     const minDuracao = 0.5; // duração mínima em segundos (muito rápido)
     
     // Limitar a velocidade do vento ao intervalo definido
@@ -75,6 +75,9 @@ class AnemometroCard extends HTMLElement {
       maxDuracao - ((velocidadeLimitada / maxVelocidade) * (maxDuracao - minDuracao))
     );
     
+    // Log para debugging
+    console.log(`Velocidade do vento: ${velocidadeLimitada} km/h, Duração animação: ${duracao}s`);
+    
     return duracao;
   }
   
@@ -89,6 +92,9 @@ class AnemometroCard extends HTMLElement {
         // Atualizar a velocidade
         animateElement.setAttribute('dur', `${this.rotationSpeed}s`);
         animateElement.setAttribute('repeatCount', 'indefinite');
+        
+        // Reiniciar a animação - importante para que a mudança tenha efeito
+        animateElement.beginElement();
       }
     }
   }
@@ -128,7 +134,7 @@ class AnemometroCard extends HTMLElement {
     this.rotationSpeed = this._calculateRotationSpeed(velocidadeVento);
     
     // Criar o conteúdo do card com uma versão para evitar problemas de cache
-    const version = "v2.0.0"; // Para garantir que temos a versão atualizada
+    const version = "v2.0.1"; // Para garantir que temos a versão atualizada
     
     this.shadowRoot.innerHTML = `
       <ha-card>
@@ -176,15 +182,15 @@ class AnemometroCard extends HTMLElement {
               
               <!-- Grupo rotativo com braços e copos -->
               <g id="rotor">
-                <!-- 3 Braços em posições de 120 graus -->
-                <line x1="100" y1="100" x2="180" y2="100" stroke="#666" stroke-width="3" />
-                <line x1="100" y1="100" x2="40" y2="160" stroke="#666" stroke-width="3" />
-                <line x1="100" y1="100" x2="40" y2="40" stroke="#666" stroke-width="3" />
+                <!-- 3 Braços em posições EXATAMENTE de 120 graus -->
+                <line x1="100" y1="100" x2="170" y2="100" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="65" y2="160.89" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="65" y2="39.11" stroke="#666" stroke-width="3" />
                 
-                <!-- 3 Copos -->
-                <path d="M180,100 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(45,180,100)" />
-                <path d="M40,160 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(165,40,160)" />
-                <path d="M40,40 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(285,40,40)" />
+                <!-- 3 Copos perfeitamente posicionados -->
+                <circle cx="170" cy="100" r="15" fill="#444" />
+                <circle cx="65" cy="160.89" r="15" fill="#444" />
+                <circle cx="65" cy="39.11" r="15" fill="#444" />
                 
                 <!-- Animação -->
                 <animateTransform
@@ -203,6 +209,11 @@ class AnemometroCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+  }
+  
+  disconnectedCallback() {
+    // Limpar qualquer recurso quando o elemento for removido
+    console.log("Anemômetro card removido");
   }
   
   // Define o tamanho do card para o Lovelace
