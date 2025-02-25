@@ -52,10 +52,11 @@ class AnemometroCard extends HTMLElement {
   
   _calculateRotationSpeed(velocidadeVento) {
     // Função que converte a velocidade do vento em velocidade de rotação (em segundos)
+    // Ajustado para escala de 0-10 km/h
     const minVelocidade = 0;
-    const maxVelocidade = 120; // km/h
+    const maxVelocidade = 10; // km/h - valor máximo ajustado
     const maxDuracao = 60; // duração máxima em segundos (praticamente parado)
-    const minDuracao = 0.2; // duração mínima em segundos (muito rápido)
+    const minDuracao = 0.5; // duração mínima em segundos (muito rápido)
     
     // Limitar a velocidade do vento ao intervalo definido
     const velocidadeLimitada = Math.max(velocidadeVento, minVelocidade);
@@ -163,17 +164,15 @@ class AnemometroCard extends HTMLElement {
               
               <!-- Grupo rotativo com braços e copos -->
               <g id="rotor">
-                <!-- Braços -->
+                <!-- 3 Braços em posições de 120 graus -->
                 <line x1="100" y1="100" x2="180" y2="100" stroke="#666" stroke-width="3" />
-                <line x1="100" y1="100" x2="100" y2="180" stroke="#666" stroke-width="3" />
-                <line x1="100" y1="100" x2="20" y2="100" stroke="#666" stroke-width="3" />
-                <line x1="100" y1="100" x2="100" y2="20" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="40" y2="160" stroke="#666" stroke-width="3" />
+                <line x1="100" y1="100" x2="40" y2="40" stroke="#666" stroke-width="3" />
                 
-                <!-- Copos -->
+                <!-- 3 Copos -->
                 <path d="M180,100 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(45,180,100)" />
-                <path d="M100,180 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(135,100,180)" />
-                <path d="M20,100 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(225,20,100)" />
-                <path d="M100,20 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(315,100,20)" />
+                <path d="M40,160 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(165,40,160)" />
+                <path d="M40,40 a15,15 0 1,1 0,-0.1 z" fill="#444" transform="rotate(285,40,40)" />
                 
                 <!-- Animação -->
                 <animateTransform
